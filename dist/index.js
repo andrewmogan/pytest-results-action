@@ -7426,7 +7426,7 @@ async function addResults(results, title, summary, displayOptions) {
 
 function addSummary(results) {
   gha.summary.addRaw(
-    `Ran ${results.total_tests} tests in ${prettyDuration(results.total_time)}. Huzzah!`,
+    `Ran ${results.total_tests} tests in ${prettyDuration(results.total_time)}.`,
     true
   );
 
