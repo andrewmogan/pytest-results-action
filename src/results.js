@@ -132,15 +132,19 @@ function addSummary(results) {
     true
   );
 
-  var rows = [["Result", "Amount"]];
+  var rows = [["Result", "Amount", "Test IDs"]];
   for (const [resultType, emoji] of resultTypesWithEmoji) {
-    const abs_amount = results[resultType].length;
+    const resultArray = results[resultType];
+    const abs_amount = resultArray.length;
     const rel_amount = abs_amount / results.total_tests;
+    const testIds = resultArray.map(testResult => testResult.id).join(', ');
     rows.push([
       `${emoji} ${resultType}`,
       `${abs_amount} (${(rel_amount * 100).toFixed(1)}%)`,
+      testIds, 
     ]);
   }
+
   gha.summary.addTable(rows);
 }
 
