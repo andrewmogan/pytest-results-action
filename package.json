@@ -1,6 +1,6 @@
 {
   "name": "pytest-results-actions",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Post pytest results to the workflow summary",
   "main": "src/main.js",
   "scripts": {
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pmeier/pytest-results-actions.git"
+    "url": "git+https://github.com/andrewmogan/pytest-results-action.git"
   },
   "keywords": [
     "pytest",
