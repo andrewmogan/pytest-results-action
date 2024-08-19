@@ -7293,6 +7293,33 @@ async function* parseXmlFiles(path) {
 
 /***/ }),
 
+/***/ 1713:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+module.exports = { main };
+
+const gha = __nccwpck_require__(2186);
+const { checkAsyncGeneratorEmpty } = __nccwpck_require__(1608);
+const { parseXmlFiles } = __nccwpck_require__(8693);
+const { postResults } = __nccwpck_require__(3188);
+
+async function main(inputs) {
+  var xmls = parseXmlFiles(inputs.path);
+
+  const { isEmpty, generator } = await checkAsyncGeneratorEmpty(xmls);
+  if (isEmpty && inputs.failOnEmpty) {
+    gha.setFailed(
+      "No JUnit XML file was found. Set `fail-on-empty: false` if that is a valid use case"
+    );
+  }
+  xmls = generator;
+
+  await postResults(xmls, inputs);
+}
+
+
+/***/ }),
+
 /***/ 3188:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -7315,7 +7342,7 @@ const resultTypes = [
 ];
 const resultTypesWithEmoji = zip(
   resultTypes,
-  ["green", "yellow", "yellow", "red", "red", , "red"].map(
+  ["green", "yellow", "yellow", "red", "red", "red"].map(
     (color) => `:${color}_circle:`
   )
 );
@@ -7344,54 +7371,56 @@ async function extractResults(xmls) {
   };
 
   for await (const xml of xmls) {
-    const testSuite = xml.testsuites.testsuite;
-    results.total_time += parseFloat(testSuite["@_time"]);
+    var testSuites = xml.testsuites.testsuite;
+    testSuites = testSuites instanceof Array ? testSuites : [testSuites];
 
-    const testCases =
-      testSuite.testcase instanceof Array
-        ? testSuite.testcase
-        : [testSuite.testcase];
-    for (const result of testCases) {
-      var resultTypeArray;
-      var msg;
+    for (var testSuite of testSuites) {
+      results.total_time += parseFloat(testSuite["@_time"]);
 
-      if (Object.hasOwn(result, "failure")) {
-        var msg = result.failure["#text"];
-        const parts = msg.split("[XPASS(strict)] ");
-        if (parts.length == 2) {
-          resultTypeArray = results.xpassed;
-          msg = parts[1];
+      var testCases = testSuite.testcase;
+      testCases = testCases instanceof Array ? testCases : [testCases];
+      for (const result of testCases) {
+        var resultTypeArray;
+        var msg;
+
+        if (Object.hasOwn(result, "failure")) {
+          var msg = result.failure["#text"];
+          const parts = msg.split("[XPASS(strict)] ");
+          if (parts.length == 2) {
+            resultTypeArray = results.xpassed;
+            msg = parts[1];
+          } else {
+            resultTypeArray = results.failed;
+          }
+        } else if (Object.hasOwn(result, "skipped")) {
+          switch (result.skipped["@_type"]) {
+            case "pytest.skip":
+              resultTypeArray = results.skipped;
+              break;
+            case "pytest.xfail":
+              resultTypeArray = results.xfailed;
+              break;
+            default:
+            // FIXME: throw an error here
+          }
+          msg = result.skipped["@_message"];
+        } else if (Object.hasOwn(result, "error")) {
+          resultTypeArray = results.error;
+          // FIXME: do we need to integrate the message here?
+          msg = result.error["#text"];
         } else {
-          resultTypeArray = results.failed;
+          // This could also be an xpass when strict=False is set. Unfortunately, there is no way to differentiate here
+          // See FIXME
+          resultTypeArray = results.passed;
+          msg = undefined;
         }
-      } else if (Object.hasOwn(result, "skipped")) {
-        switch (result.skipped["@_type"]) {
-          case "pytest.skip":
-            resultTypeArray = results.skipped;
-            break;
-          case "pytest.xfail":
-            resultTypeArray = results.xfailed;
-            break;
-          default:
-          // FIXME: throw an error here
-        }
-        msg = result.skipped["@_message"];
-      } else if (Object.hasOwn(result, "error")) {
-        resultTypeArray = results.error;
-        // FIXME: do we need to integrate the message here?
-        msg = result.error["#text"];
-      } else {
-        // This could also be an xpass when strict=False is set. Unfortunately, there is no way to differentiate here
-        // See FIXME
-        resultTypeArray = results.passed;
-        msg = undefined;
-      }
 
-      resultTypeArray.push({
-        id: result["@_classname"] + "." + result["@_name"],
-        msg: msg,
-      });
-      results.total_tests += 1;
+        resultTypeArray.push({
+          id: result["@_classname"] + "." + result["@_name"],
+          msg: msg,
+        });
+        results.total_tests += 1;
+      }
     }
   }
 
@@ -7414,12 +7443,15 @@ async function addResults(results, title, summary, displayOptions) {
     gha.summary.addHeading(resultType, 2);
 
     for (const result of results_for_type) {
-      // FIXME: check if message is undefined otherwise, just post this as regular line
-      addDetailsWithCodeBlock(
-        gha.summary,
-        gha.summary.wrap("code", result.id),
-        result.msg
-      );
+      if (result.msg) {
+        addDetailsWithCodeBlock(
+          gha.summary,
+          gha.summary.wrap("code", result.id),
+          result.msg
+        );
+      } else {
+        gha.summary.addRaw(`\n:heavy_check_mark: ${result.id}`, true);
+      }
     }
   }
 }
@@ -7675,24 +7707,12 @@ var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
 const gha = __nccwpck_require__(2186);
-const { checkAsyncGeneratorEmpty } = __nccwpck_require__(1608);
-const { parseXmlFiles } = __nccwpck_require__(8693);
-const { postResults } = __nccwpck_require__(3188);
 
-async function main() {
+const { main } = __nccwpck_require__(1713);
+
+async function entrypoint() {
   const inputs = getInputs();
-
-  var xmls = parseXmlFiles(inputs.path);
-
-  const { isEmpty, generator } = await checkAsyncGeneratorEmpty(xmls);
-  if (isEmpty && inputs.failOnEmpty) {
-    gha.setFailed(
-      "No JUnit XML file was found. Set `fail-on-empty: false` if that is a valid use case"
-    );
-  }
-  xmls = generator;
-
-  await postResults(xmls, inputs);
+  await main(inputs);
 }
 
 function getInputs() {
@@ -7709,7 +7729,7 @@ function getInputs() {
   };
 }
 
-main();
+entrypoint();
 
 })();
 
